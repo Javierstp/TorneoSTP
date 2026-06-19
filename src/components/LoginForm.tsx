@@ -26,7 +26,7 @@ export function LoginForm({ onSuccess }: Props) {
   }
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm mx-auto mt-8">
       <div className="card-surface p-8">
         <div className="w-12 h-12 mx-auto rounded-full bg-amber-400/10 flex items-center justify-center mb-5">
           <Shield className="w-6 h-6 text-amber-400" />

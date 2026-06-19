@@ -257,6 +257,11 @@ export async function generateGroupStage(
   }
   // Clean previous group data
   await deleteMatchesByPhase(tournamentId, 'group')
+  // Clean knockout matches from previous generation
+  const koPhases: MatchPhase[] = ['round_of_16', 'quarter', 'semi', 'third_place', 'final']
+  for (const phase of koPhases) {
+    await deleteMatchesByPhase(tournamentId, phase)
+  }
   const { error: delGroupsError } = await supabase
     .from('groups')
     .delete()
@@ -266,10 +271,15 @@ export async function generateGroupStage(
   // Shuffle players for random draw
   const shuffled = shuffle(players)
   const numGroups = Math.ceil(shuffled.length / 4)
+  const baseSize = Math.floor(shuffled.length / numGroups)
+  const extra = shuffled.length % numGroups
   const groups: Group[] = []
 
+  let playerIdx = 0
   for (let i = 0; i < numGroups; i++) {
-    const groupPlayers = shuffled.slice(i * 4, i * 4 + 4)
+    const size = i < extra ? baseSize + 1 : baseSize
+    const groupPlayers = shuffled.slice(playerIdx, playerIdx + size)
+    playerIdx += size
     if (groupPlayers.length === 0) continue
 
     const { data: g, error } = await supabase
@@ -554,15 +564,41 @@ export async function saveMatchResult(
     const loserId =
       winnerId === match.home_player_id ? match.away_player_id : match.home_player_id
     const position = match.next_match_position === 'away' ? 'away_player_id' : 'home_player_id'
-    const { data: thirdPlaceMatches } = await supabase
+    let { data: thirdPlaceMatches } = await supabase
       .from('matches')
       .select('*')
       .eq('tournament_id', match.tournament_id)
       .eq('phase', 'third_place')
+
+    // Create third place match if it doesn't exist (defensive fallback)
+    if (!thirdPlaceMatches || thirdPlaceMatches.length === 0) {
+      const { data: created } = await supabase
+        .from('matches')
+        .insert({
+          tournament_id: match.tournament_id,
+          phase: 'third_place',
+          round_order: 0,
+          status: 'scheduled',
+        })
+        .select()
+        .single()
+      if (created) thirdPlaceMatches = [created]
+    }
+
     if (thirdPlaceMatches && thirdPlaceMatches.length > 0) {
+      const updateData: Record<string, any> = { [position]: loserId }
+      // Reset result if third place match was finished (players changed)
+      if (thirdPlaceMatches[0].status === 'finished') {
+        updateData.status = 'scheduled'
+        updateData.home_score = null
+        updateData.away_score = null
+        updateData.penalties_home = null
+        updateData.penalties_away = null
+        updateData.winner_player_id = null
+      }
       await supabase
         .from('matches')
-        .update({ [position]: loserId })
+        .update(updateData)
         .eq('id', thirdPlaceMatches[0].id)
     }
   }
@@ -571,6 +607,14 @@ export async function saveMatchResult(
 }
 
 export async function deleteAllTournamentData(tournamentId: string) {
+  const { data: matchIds } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('tournament_id', tournamentId)
+  const ids = matchIds?.map(m => m.id) || []
+  if (ids.length > 0) {
+    await supabase.from('result_edits').delete().in('match_id', ids)
+  }
   await supabase.from('matches').delete().eq('tournament_id', tournamentId)
   await supabase.from('players').delete().eq('tournament_id', tournamentId)
   await supabase.from('groups').delete().eq('tournament_id', tournamentId)

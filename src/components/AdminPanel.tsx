@@ -10,7 +10,10 @@ import {
   generateKnockoutStage,
   updateMatch,
   saveMatchResult,
-  signOut
+  signOut,
+  deleteAllTournamentData,
+  getSession,
+  updateTournamentStatus
 } from '../lib/data'
 import { COUNTRIES } from '../lib/countries'
 import { PlayerBadge } from './PlayerBadge'
@@ -45,7 +48,7 @@ export function AdminPanel({
 }: Props) {
   const [activeTab, setActiveTab] = useState<
     'tournament' | 'players' | 'groups' | 'matches' | 'knockout'
-  >('tournament')
+  >('players')
 
   async function handleSignOut() {
     await signOut()
@@ -64,11 +67,11 @@ export function AdminPanel({
   }
 
   const tabs = [
-    { key: 'tournament' as const, icon: Trophy, label: 'Torneo' },
     { key: 'players' as const, icon: Users, label: 'Jugadores' },
     { key: 'groups' as const, icon: Swords, label: 'Grupos' },
     { key: 'matches' as const, icon: Calendar, label: 'Partidos' },
-    { key: 'knockout' as const, icon: Trophy, label: 'Eliminatoria' }
+    { key: 'knockout' as const, icon: Trophy, label: 'Eliminatoria' },
+    { key: 'tournament' as const, icon: Trophy, label: 'Torneo' }
   ]
 
   return (
@@ -88,7 +91,7 @@ export function AdminPanel({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 mb-6">
+      <div className="flex flex-wrap gap-1.5 mb-6 justify-center">
         {tabs.map(({ key, icon: Icon, label }) => (
           <button
             key={key}
@@ -151,13 +154,12 @@ function CreateTournamentForm({
   onCreated: () => Promise<void>
 }) {
   const [name, setName] = useState('')
-  const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    await createTournament(name, deadline || undefined)
+    await createTournament(name)
     setLoading(false)
     await onCreated()
   }
@@ -174,17 +176,6 @@ function CreateTournamentForm({
           className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
           placeholder="Ej: Copa Mundial 2026"
           required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-1.5">
-          Fecha límite de inscripción
-        </label>
-        <input
-          type="datetime-local"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-          className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
         />
       </div>
       <button
@@ -212,26 +203,49 @@ function TournamentEditor({
   onChange: () => Promise<void>
 }) {
   const [name, setName] = useState(tournament.name)
-  const [deadline, setDeadline] = useState(
-    tournament.registration_deadline
-      ? new Date(tournament.registration_deadline).toISOString().slice(0, 16)
-      : ''
-  )
   const [saved, setSaved] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
+  const [password, setPassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   async function handleSave() {
-    await supabase
-      .from('tournaments')
-      .update({ name, registration_deadline: deadline || null })
-      .eq('id', tournament.id)
+    await supabase.from('tournaments').update({ name }).eq('id', tournament.id)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
     await onChange()
   }
 
+  async function handleDelete() {
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      const { data } = await getSession()
+      const email = data.session?.user?.email
+      if (!email) throw new Error('No se pudo obtener el email del admin')
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      if (error) throw new Error('Contraseña incorrecta')
+
+      await deleteAllTournamentData(tournament.id)
+      window.location.reload()
+    } catch (e: unknown) {
+      setDeleteError(
+        e instanceof Error ? e.message : 'Error al eliminar torneo'
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
-    <div className="card-surface p-6 space-y-4 max-w-xl">
-      <h3 className="font-bold text-gray-200">Configuración del torneo</h3>
+    <div className="card-surface p-6 space-y-4 max-w-md mx-auto">
+      <h3 className="font-bold text-gray-200 text-center">
+        Configuración del torneo
+      </h3>
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">
           Nombre
@@ -239,17 +253,6 @@ function TournamentEditor({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-1.5">
-          Fecha límite de inscripción
-        </label>
-        <input
-          type="datetime-local"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
           className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
         />
       </div>
@@ -264,6 +267,80 @@ function TournamentEditor({
           <span className="flex items-center gap-1 text-emerald-400 text-sm">
             <Check className="w-4 h-4" /> Guardado
           </span>
+        )}
+      </div>
+
+      <hr className="border-[#1e2d45]" />
+
+      {(tournament.status === 'groups' || tournament.status === 'knockout') && (
+        <>
+          <button
+            onClick={async () => {
+              if (
+                !confirm(
+                  '¿Finalizar torneo? Esto marcará el torneo como completado.'
+                )
+              )
+                return
+              await updateTournamentStatus(tournament.id, 'finished')
+              await onChange()
+            }}
+            className="flex items-center gap-2 text-emerald-400/70 hover:text-emerald-400 text-sm font-medium transition"
+          >
+            <Trophy className="w-4 h-4" /> Finalizar torneo
+          </button>
+          <hr className="border-[#1e2d45]" />
+        </>
+      )}
+
+      <div>
+        {!showDelete ? (
+          <button
+            onClick={() => setShowDelete(true)}
+            className="flex items-center gap-2 text-red-400/70 hover:text-red-400 text-sm font-medium transition"
+          >
+            <Trash2 className="w-4 h-4" /> Eliminar torneo
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-red-400/80 font-medium">
+              Ingresa tu contraseña de admin para confirmar
+            </p>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Contraseña"
+              className="w-full rounded-lg border border-red-400/30 bg-[#0a1120] px-3 py-2 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-red-400/50"
+            />
+            {deleteError && (
+              <p className="text-red-400 text-xs">{deleteError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleDelete}
+                disabled={deleting || !password}
+                className="flex items-center gap-2 bg-red-500/15 text-red-400 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-500/25 disabled:opacity-40 transition"
+              >
+                {deleting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                {deleting ? 'Eliminando...' : 'Confirmar'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDelete(false)
+                  setPassword('')
+                  setDeleteError('')
+                }}
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-300 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -301,7 +378,7 @@ function PlayerManager({
 
   return (
     <div className="space-y-6">
-      <div className="card-surface p-6 max-w-xl">
+      <div className="card-surface p-6 max-w-xl mx-auto">
         <h3 className="font-bold text-gray-200 mb-4">Agregar jugador</h3>
         <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-3">
           <input
@@ -337,13 +414,15 @@ function PlayerManager({
         </form>
       </div>
 
-      <div className="card-surface p-6">
+      <div className="card-surface p-6 max-w-4xl mx-auto">
         <h3 className="font-bold text-gray-200 mb-4">
           Jugadores registrados{' '}
           <span className="text-gray-500 font-normal">({players.length})</span>
         </h3>
         {players.length === 0 ? (
-          <p className="text-gray-500 text-sm">No hay jugadores registrados.</p>
+          <p className="text-gray-500 text-sm text-center py-8">
+            No hay jugadores registrados.
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {[...players]
@@ -418,7 +497,7 @@ function GroupManager({
 
   return (
     <div className="space-y-6">
-      <div className="card-surface p-6 max-w-xl">
+      <div className="card-surface p-6 max-w-xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-200">Generar grupos</h3>
           <span className="text-sm text-gray-500">
@@ -450,7 +529,9 @@ function GroupManager({
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-gray-500 text-sm">Aún no hay grupos generados.</p>
+        <p className="text-gray-500 text-sm text-center py-8">
+          Aún no hay grupos generados.
+        </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {groups.map((g) => (
@@ -549,6 +630,16 @@ function MatchManager({
   const sorted = [...matches].sort((a, b) => {
     if (a.phase === 'group' && b.phase !== 'group') return -1
     if (a.phase !== 'group' && b.phase === 'group') return 1
+
+    if (a.phase === 'group' && b.phase === 'group') {
+      const gA = groupMap.get(a.group_id || '')?.order_index ?? 0
+      const gB = groupMap.get(b.group_id || '')?.order_index ?? 0
+      if (gA !== gB) return gA - gB
+      const aHasDate = a.scheduled_at ? 0 : 1
+      const bHasDate = b.scheduled_at ? 0 : 1
+      if (aHasDate !== bHasDate) return bHasDate - aHasDate
+    }
+
     const dateA = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity
     const dateB = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity
     return dateA - dateB || a.created_at.localeCompare(b.created_at)
@@ -665,7 +756,17 @@ function MatchManager({
                   </span>
                 )}
                 <button
-                  onClick={() => setEditingId(editingId === m.id ? null : m.id)}
+                  onClick={() => {
+                    if (m.status === 'finished' && editingId !== m.id) {
+                      if (
+                        !confirm(
+                          'Este partido ya está finalizado. ¿Reemplazar el resultado actual?'
+                        )
+                      )
+                        return
+                    }
+                    setEditingId(editingId === m.id ? null : m.id)
+                  }}
                   className={`text-sm font-medium rounded-lg px-3 py-1.5 transition ${
                     m.status === 'finished'
                       ? 'bg-amber-400/10 text-amber-400 hover:bg-amber-400/20'
@@ -819,8 +920,8 @@ function KnockoutManager({
     try {
       await generateKnockoutStage(tournament.id, players, groups, matches)
       await onChange()
-    } catch (e: any) {
-      setError(e.message || 'Error al generar eliminatoria')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al generar eliminatoria')
     } finally {
       setLoading(false)
     }
@@ -832,7 +933,7 @@ function KnockoutManager({
   const totalGroupMatches = matches.filter((m) => m.phase === 'group').length
 
   return (
-    <div className="card-surface p-6 max-w-xl">
+    <div className="card-surface p-6 max-w-xl mx-auto">
       <h3 className="font-bold text-gray-200 mb-4">
         Generar fase eliminatoria
       </h3>
