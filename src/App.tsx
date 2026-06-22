@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Tournament, Group, Player, Match } from './types'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import {
   fetchTournaments,
@@ -15,7 +16,8 @@ import { FixtureView } from './components/FixtureView'
 import { HistoryView } from './components/HistoryView'
 import { AdminPanel } from './components/AdminPanel'
 import { LoginForm } from './components/LoginForm'
-import { Trophy, Users, CalendarDays, History, Shield, Loader2 } from 'lucide-react'
+import { PlayerBadge } from './components/PlayerBadge'
+import { Trophy, Users, CalendarDays, History, Shield, Loader2, Plus } from 'lucide-react'
 
 type View = 'home' | 'groups' | 'fixture' | 'history' | 'admin' | 'login'
 
@@ -39,9 +41,11 @@ function App() {
   const [players, setPlayers] = useState<Player[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [matches, setMatches] = useState<Match[]>([])
-  const [session, setSession] = useState<any>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [view, setView] = useState<View>('home')
   const [loading, setLoading] = useState(true)
+
+  const [playersLoading, setPlayersLoading] = useState(false)
 
   async function loadData() {
     try {
@@ -53,12 +57,10 @@ function App() {
         return
       }
       setTournament(current)
-      const [p, g, m] = await Promise.all([
-        fetchPlayers(current.id),
+      const [g, m] = await Promise.all([
         fetchGroups(current.id),
         fetchMatches(current.id),
       ])
-      setPlayers(p)
       setGroups(g)
       setMatches(m)
     } catch (e) {
@@ -68,7 +70,20 @@ function App() {
     }
   }
 
+  async function loadPlayers(tournamentId: string) {
+    setPlayersLoading(true)
+    try {
+      const p = await fetchPlayers(tournamentId)
+      setPlayers(p)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setPlayersLoading(false)
+    }
+  }
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData()
     getSession().then(({ data }) => setSession(data.session))
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -76,6 +91,14 @@ function App() {
     })
     return () => listener?.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (tournament) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadPlayers(tournament.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament?.id])
 
   const refresh = async () => {
     if (!tournament) return
@@ -148,7 +171,7 @@ function App() {
     )
   }
 
-  const navItems: { key: View; label: string; icon: any }[] = [
+  const navItems: { key: View; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { key: 'home', label: 'Inicio', icon: Trophy },
     { key: 'groups', label: 'Grupos', icon: Users },
     { key: 'fixture', label: 'Partidos', icon: CalendarDays },
@@ -210,16 +233,55 @@ function App() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {view === 'home' && (tournament.status === 'knockout' || tournament.status === 'finished') && (
-          <Bracket tournament={tournament} players={players} matches={matches} />
-        )}
-        {view === 'home' && (tournament.status === 'setup' || tournament.status === 'groups') && (
-          <GroupsView
-            tournament={tournament}
-            players={players}
-            groups={groups}
-            matches={matches}
-          />
+        {view === 'home' && (
+          <>
+            {tournament.status === 'setup' && (
+            <div className="card-surface p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-100">
+                  Jugadores registrados{' '}
+                  <span className="text-gray-500 font-normal">({players.length})</span>
+                </h3>
+                {isAdmin && (
+                  <button
+                    onClick={() => setView('admin')}
+                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-lg px-4 py-2 text-sm font-semibold hover:from-amber-400 hover:to-amber-500 transition"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar jugador
+                  </button>
+                )}
+              </div>
+              {playersLoading ? (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                  <span className="text-gray-500 text-sm">Cargando jugadores...</span>
+                </div>
+              ) : players.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-8">Aún no hay jugadores registrados.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {[...players]
+                    .sort((a, b) => a.country_code.localeCompare(b.country_code))
+                    .map((p) => (
+                      <div key={p.id} className="border border-[#1e2d45] rounded-lg p-3">
+                        <PlayerBadge player={p} />
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+            )}
+            {tournament.status === 'knockout' || tournament.status === 'finished' ? (
+              <Bracket tournament={tournament} players={players} matches={matches} />
+            ) : (
+              <GroupsView
+                tournament={tournament}
+                players={players}
+                groups={groups}
+                matches={matches}
+              />
+            )}
+          </>
         )}
         {view === 'groups' && (
           <GroupsView

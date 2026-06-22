@@ -13,7 +13,8 @@ import {
   signOut,
   deleteAllTournamentData,
   getSession,
-  updateTournamentStatus
+  updateTournamentStatus,
+  updatePassword
 } from '../lib/data'
 import { COUNTRIES } from '../lib/countries'
 import { PlayerBadge } from './PlayerBadge'
@@ -28,7 +29,10 @@ import {
   Plus,
   Loader2,
   Check,
-  ChevronRight
+  ChevronRight,
+  Key,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 
 interface Props {
@@ -208,6 +212,13 @@ function TournamentEditor({
   const [password, setPassword] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordChanging, setPasswordChanging] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [showPasswords, setShowPasswords] = useState(false)
 
   async function handleSave() {
     await supabase.from('tournaments').update({ name }).eq('id', tournament.id)
@@ -238,6 +249,31 @@ function TournamentEditor({
       )
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function handlePasswordChange() {
+    setPasswordError('')
+    setPasswordSuccess(false)
+    if (newPassword.length < 6) {
+      setPasswordError('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden')
+      return
+    }
+    setPasswordChanging(true)
+    try {
+      await updatePassword(newPassword)
+      setPasswordSuccess(true)
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => setShowPasswordChange(false), 2000)
+    } catch (e: unknown) {
+      setPasswordError(e instanceof Error ? e.message : 'Error al cambiar contraseña')
+    } finally {
+      setPasswordChanging(false)
     }
   }
 
@@ -334,6 +370,95 @@ function TournamentEditor({
                   setShowDelete(false)
                   setPassword('')
                   setDeleteError('')
+                }}
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-300 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <hr className="border-[#1e2d45]" />
+
+      <div>
+        {!showPasswordChange ? (
+          <button
+            onClick={() => {
+              setShowPasswordChange(true)
+              setPasswordError('')
+              setPasswordSuccess(false)
+            }}
+            className="flex items-center gap-2 text-amber-400/70 hover:text-amber-400 text-sm font-medium transition"
+          >
+            <Key className="w-4 h-4" /> Cambiar contraseña
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-amber-400/80 font-medium">
+              Ingresa tu nueva contraseña
+            </p>
+            <div className="relative">
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Nueva contraseña"
+                className="w-full rounded-lg border border-amber-400/30 bg-[#0a1120] px-3 py-2 pr-10 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPasswords(!showPasswords)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+              >
+                {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirmar contraseña"
+                className="w-full rounded-lg border border-amber-400/30 bg-[#0a1120] px-3 py-2 pr-10 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPasswords(!showPasswords)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+              >
+                {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {passwordError && (
+              <p className="text-red-400 text-xs">{passwordError}</p>
+            )}
+            {passwordSuccess && (
+              <p className="text-emerald-400 text-xs flex items-center gap-1">
+                <Check className="w-3 h-3" /> Contraseña actualizada
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handlePasswordChange}
+                disabled={passwordChanging || !newPassword || !confirmPassword}
+                className="flex items-center gap-2 bg-amber-500/15 text-amber-400 rounded-lg px-4 py-2 text-sm font-medium hover:bg-amber-500/25 disabled:opacity-40 transition"
+              >
+                {passwordChanging ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Key className="w-4 h-4" />
+                )}
+                {passwordChanging ? 'Cambiando...' : 'Cambiar'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowPasswordChange(false)
+                  setNewPassword('')
+                  setConfirmPassword('')
+                  setPasswordError('')
+                  setPasswordSuccess(false)
                 }}
                 className="px-3 py-2 text-sm text-gray-500 hover:text-gray-300 transition"
               >

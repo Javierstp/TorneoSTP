@@ -606,6 +606,11 @@ export async function saveMatchResult(
   return updated
 }
 
+export async function updatePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
 export async function deleteAllTournamentData(tournamentId: string) {
   const { data: matchIds } = await supabase
     .from('matches')
