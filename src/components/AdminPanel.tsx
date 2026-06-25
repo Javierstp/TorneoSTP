@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import {
   createTournament,
   createPlayer,
+  updatePlayer,
   updatePlayerGroup,
   deletePlayer,
   generateGroupStage,
@@ -32,7 +33,9 @@ import {
   ChevronRight,
   Key,
   Eye,
-  EyeOff
+  EyeOff,
+  Pencil,
+  X
 } from 'lucide-react'
 
 interface Props {
@@ -483,14 +486,28 @@ function PlayerManager({
 }) {
   const [name, setName] = useState('')
   const [countryCode, setCountryCode] = useState(COUNTRIES[0].code)
+  const [department, setDepartment] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editCountryCode, setEditCountryCode] = useState(COUNTRIES[0].code)
+  const [editDepartment, setEditDepartment] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     const country = COUNTRIES.find((c) => c.code === countryCode)!
-    await createPlayer(tournament.id, name, country.code, country.name)
+    await createPlayer(
+      tournament.id,
+      name,
+      country.code,
+      country.name,
+      department
+    )
     setName('')
+    setDepartment('')
     await onChange()
     setSaving(false)
   }
@@ -501,33 +518,71 @@ function PlayerManager({
     await onChange()
   }
 
+  function startEdit(p: Player) {
+    setEditingPlayer(p)
+    setEditName(p.name)
+    setEditCountryCode(p.country_code)
+    setEditDepartment(p.department || '')
+  }
+
+  function cancelEdit() {
+    setEditingPlayer(null)
+    setEditName('')
+    setEditCountryCode(COUNTRIES[0].code)
+    setEditDepartment('')
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingPlayer) return
+    setEditSaving(true)
+    const country = COUNTRIES.find((c) => c.code === editCountryCode)!
+    await updatePlayer(editingPlayer.id, {
+      name: editName,
+      country_code: country.code,
+      country_name: country.name,
+      department: editDepartment || null
+    })
+    setEditingPlayer(null)
+    await onChange()
+    setEditSaving(false)
+  }
+
   return (
     <div className="space-y-6">
-      <div className="card-surface p-6 max-w-xl mx-auto">
+      <div className="card-surface p-6 max-w-2xl mx-auto">
         <h3 className="font-bold text-gray-200 mb-4">Agregar jugador</h3>
-        <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-3">
+        <form onSubmit={handleAdd} className="flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre del jugador"
+              className="flex-1 rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
+              required
+            />
+            <select
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              className="rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} - {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre del jugador"
-            className="flex-1 rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
-            required
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            placeholder="Departamento (opcional)"
+            className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
           />
-          <select
-            value={countryCode}
-            onChange={(e) => setCountryCode(e.target.value)}
-            className="rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2.5 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code} - {c.name}
-              </option>
-            ))}
-          </select>
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-lg px-4 py-2.5 font-semibold hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 transition text-sm"
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-lg px-4 py-2.5 font-semibold hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 transition text-sm"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -549,26 +604,121 @@ function PlayerManager({
             No hay jugadores registrados.
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[...players]
               .sort((a, b) => a.country_code.localeCompare(b.country_code))
               .map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between border border-[#1e2d45] rounded-lg p-3 hover:border-gray-600 transition"
+                  className="border border-[#1e2d45] rounded-lg p-3 hover:border-gray-600 transition"
                 >
-                  <PlayerBadge player={p} />
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="text-red-400/60 hover:text-red-400 transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-between gap-2">
+                    <PlayerBadge player={p} />
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => startEdit(p)}
+                        className="text-amber-400/60 hover:text-amber-400 transition p-1"
+                        title="Editar jugador"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="text-red-400/60 hover:text-red-400 transition p-1"
+                        title="Eliminar jugador"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      {editingPlayer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) cancelEdit()
+          }}
+        >
+          <div className="card-surface w-full max-w-md p-6 space-y-4 relative">
+            <button
+              onClick={cancelEdit}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-300 transition"
+              title="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <h3 className="font-bold text-gray-200">Editar jugador</h3>
+            <form onSubmit={handleSaveEdit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  Nombre
+                </label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Nombre"
+                  className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  País
+                </label>
+                <select
+                  value={editCountryCode}
+                  onChange={(e) => setEditCountryCode(e.target.value)}
+                  className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2 text-gray-200 text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} - {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  Departamento
+                </label>
+                <input
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  placeholder="Departamento"
+                  className="w-full rounded-lg border border-[#1e2d45] bg-[#0a1120] px-3 py-2 text-gray-200 text-sm placeholder:text-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-lg px-4 py-2.5 font-semibold hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 transition text-sm"
+                >
+                  {editSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {editSaving ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-300 font-medium transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -22,6 +22,7 @@ export interface Player {
   name: string;
   country_code: string;
   country_name: string;
+  department: string | null;
 }
 
 export type MatchPhase = 'group' | 'round_of_16' | 'quarter' | 'semi' | 'third_place' | 'final';

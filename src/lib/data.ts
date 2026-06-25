@@ -91,7 +91,8 @@ export async function createPlayer(
   tournamentId: string,
   name: string,
   countryCode: string,
-  countryName: string
+  countryName: string,
+  department?: string
 ): Promise<Player> {
   const { data, error } = await supabase
     .from('players')
@@ -100,7 +101,27 @@ export async function createPlayer(
       name,
       country_code: countryCode,
       country_name: countryName,
+      department: department || null,
     })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updatePlayer(
+  playerId: string,
+  updates: {
+    name?: string
+    country_code?: string
+    country_name?: string
+    department?: string | null
+  }
+): Promise<Player> {
+  const { data, error } = await supabase
+    .from('players')
+    .update(updates)
+    .eq('id', playerId)
     .select()
     .single()
   if (error) throw error

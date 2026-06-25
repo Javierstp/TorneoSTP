@@ -51,7 +51,12 @@ export function PlayerBadge({ player, reverse, compact }: Props) {
           {player.country_code}
         </div>
         {!compact && (
-          <div className="text-xs text-gray-400">{player.name}</div>
+          <>
+            <div className="text-xs text-gray-400">{player.name}</div>
+            {player.department && (
+              <div className="text-xs text-amber-400/80">{player.department}</div>
+            )}
+          </>
         )}
       </div>
     </div>
