@@ -300,7 +300,15 @@ export async function generateGroupStage(
   }
 
   // Create round-robin matches inside each group
-  const matchInserts: any[] = []
+  const matchInserts: {
+    tournament_id: string
+    group_id: string
+    phase: 'group'
+    round_order: number
+    home_player_id: string
+    away_player_id: string
+    status: 'scheduled'
+  }[] = []
 
   // Fetch updated players
   const updatedPlayers = await fetchPlayers(tournamentId)
@@ -586,7 +594,7 @@ export async function saveMatchResult(
     }
 
     if (thirdPlaceMatches && thirdPlaceMatches.length > 0) {
-      const updateData: Record<string, any> = { [position]: loserId }
+      const updateData: Record<string, string | null> = { [position]: loserId }
       // Reset result if third place match was finished (players changed)
       if (thirdPlaceMatches[0].status === 'finished') {
         updateData.status = 'scheduled'

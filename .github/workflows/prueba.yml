@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ['main']
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,6 +31,9 @@ jobs:
 
       - name: Run Tests
         run: npm test
+
+      - name: Lint
+        run: npm run lint
 
       - name: Build
         run: npm run build
