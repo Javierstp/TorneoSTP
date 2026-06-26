@@ -88,7 +88,7 @@ export function GroupsView({ players, groups, matches }: Props) {
                           )}
                         </td>
                         <td className="pr-4 py-2.5">
-                          <PlayerBadge player={s.player} compact />
+                          <PlayerBadge player={s.player} />
                         </td>
                         <td className="text-center py-2.5 px-2 text-gray-300 font-mono">{s.played}</td>
                         <td className="text-center py-2.5 px-2 text-gray-300 font-mono">{s.won}</td>

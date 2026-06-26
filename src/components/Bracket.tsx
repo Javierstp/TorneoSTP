@@ -1,5 +1,6 @@
 import type { Tournament, Player, Match } from '../types'
 import { PlayerBadge } from './PlayerBadge'
+import { formatMatchDate } from '../lib/date'
 
 interface Props {
   tournament: Tournament
@@ -152,12 +153,19 @@ function MatchCard({
         </div>
       )}
       {match.scheduled_at && !isFinished && (
-        <div className="border-t border-[#1e2d45]/30 px-3.5 py-1.5 text-xs text-gray-600 text-center">
-          {new Date(match.scheduled_at).toLocaleString('es-ES', {
-            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-          })}
+        <div className="border-t border-[#1e2d45]/30 px-3.5 py-1.5 text-xs text-sky-300 text-center flex items-center justify-center gap-1">
+          <ClockIcon />
+          {formatMatchDate(match.scheduled_at)}
         </div>
       )}
     </div>
+  )
+}
+
+function ClockIcon() {
+  return (
+    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
   )
 }

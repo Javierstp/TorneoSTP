@@ -1,5 +1,6 @@
 import type { Player, Match } from '../types'
 import { PlayerBadge } from './PlayerBadge'
+import { formatMatchDate } from '../lib/date'
 
 interface Props {
   players: Player[]
@@ -87,18 +88,25 @@ export function FixtureView({ players, matches }: Props) {
                   />
                 </div>
               </div>
-              <div className="text-xs text-gray-500 md:w-32 md:text-right shrink-0">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-sky-300 bg-sky-500/10 rounded-md px-2 py-1 shrink-0">
+                <ClockIcon />
                 {m.scheduled_at
-                  ? new Date(m.scheduled_at).toLocaleString('es-ES', {
-                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                    })
-                  : <span className="italic">Sin fecha</span>}
+                  ? formatMatchDate(m.scheduled_at)
+                  : <span className="italic text-gray-500">Sin fecha</span>}
               </div>
             </div>
           )
         })}
       </div>
     </div>
+  )
+}
+
+function ClockIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
   )
 }
 

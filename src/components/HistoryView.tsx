@@ -1,5 +1,6 @@
 import type { Player, Match } from '../types'
 import { PlayerBadge } from './PlayerBadge'
+import { formatMatchDate } from '../lib/date'
 
 interface Props {
   players: Player[]
@@ -85,10 +86,9 @@ export function HistoryView({ players, matches }: Props) {
                 </div>
               )}
               {m.scheduled_at && (
-                <div className="text-xs text-gray-600 text-center mt-2">
-                  {new Date(m.scheduled_at).toLocaleString('es-ES', {
-                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                  })}
+                <div className="text-xs text-sky-300 text-center mt-2 flex items-center justify-center gap-1">
+                  <ClockIcon />
+                  {formatMatchDate(m.scheduled_at)}
                 </div>
               )}
             </div>
@@ -96,5 +96,13 @@ export function HistoryView({ players, matches }: Props) {
         })}
       </div>
     </div>
+  )
+}
+
+function ClockIcon() {
+  return (
+    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
   )
 }
